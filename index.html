@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>K-pop 性格档案</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; background: #121212; color: #fff; display: flex; justify-content: center; min-height: 100vh; }
+    .container { width: 100%; max-width: 480px; padding: 24px; box-sizing: border-box; }
+    .hidden { display: none; }
+    .input-box { text-align: center; margin-top: 60px; }
+    .code-input { width: 100%; padding: 16px; font-size: 28px; letter-spacing: 8px; text-align: center; text-transform: uppercase; border: 2px solid #333; background: #1e1e1e; color: #fff; border-radius: 12px; margin: 24px 0; outline: none; }
+    .btn { width: 100%; padding: 16px; background: #ff3366; color: #fff; font-weight: bold; border: none; border-radius: 12px; font-size: 18px; cursor: pointer; }
+    .btn:disabled { background: #444; }
+    .error { color: #ff4444; font-size: 14px; margin-top: 12px; display: none; }
+    
+    /* 结果卡片样式 */
+    #poster { background: linear-gradient(145deg, #2a1a20, #1e1e1e); padding: 32px 24px; border-radius: 16px; border: 1px solid #333; text-align: center; }
+    .idol-name { font-size: 36px; font-weight: 800; margin: 8px 0; color: #ff3366; }
+    .detail-box { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; text-align: left; font-size: 15px; line-height: 1.6; color: #ddd; border-left: 4px solid #ff3366; margin-top: 20px;}
+    
+    /* 管理员入口 (放在底部，很小) */
+    .admin-link { position: fixed; bottom: 10px; right: 10px; font-size: 10px; color: #333; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 用户解锁视图 -->
+  <div id="userView" class="input-box">
+    <h2>✨ 专属档案解锁</h2>
+    <p style="color:#888;">请输入你的 6 位一次性访问码</p>
+    <input type="text" id="codeInput" class="code-input" maxlength="6" placeholder="X X X X X X">
+    <button id="verifyBtn" class="btn" onclick="verifyCode()">解锁档案</button>
+    <div id="errorMsg" class="error"></div>
+  </div>
+
+  <!-- 结果视图 -->
+  <div id="resultView" class="hidden">
+    <div id="poster">
+      <div style="font-size:12px; color:#888; letter-spacing:2px;">K-POP PERSONALITY ARCHIVE</div>
+      <h1 class="idol-name" id="resName">--</h1>
+      <div class="idol-desc" id="resDesc" style="color:#aaa; font-size:18px;">--</div>
+      <div class="detail-box" id="resDetail">--</div>
+      <div style="margin-top:30px; font-size:12px; color:#555;">授权码已核销 · 仅供个人收藏</div>
+    </div>
+    <p style="text-align:center; color:#888; margin-top:20px;">👆 长按上方卡片保存图片</p>
+    <button class="btn" style="background:#333; margin-top:20px;" onclick="location.reload()">返回</button>
+  </div>
+
+  <!-- 管理员生成视图 (默认隐藏) -->
+  <div id="adminView" class="hidden input-box">
+    <h2>🔐 管理员生成器</h2>
+    <input type="password" id="adminPass" class="code-input" placeholder="输入管理员密码" style="font-size:16px; letter-spacing:1px;">
+    <button class="btn" onclick="generateCode()">生成新授权码</button>
+    <div id="genResult" style="margin-top:20px; font-size:24px; color:#ff3366; font-weight:bold;"></div>
+    <button class="btn" style="background:#333; margin-top:20px;" onclick="location.reload()">返回用户页</button>
+  </div>
+</div>
+
+<!-- 管理员入口 -->
+<a href="#admin" class="admin-link" onclick="showAdmin()">Admin</a>
+
+<script>
+  // 自动转大写
+  document.getElementById('codeInput').addEventListener('input', function(e) {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  });
+
+  async function verifyCode() {
+    const code = document.getElementById('codeInput').value.trim();
+    const btn = document.getElementById('verifyBtn');
+    const errorMsg = document.getElementById('errorMsg');
+    
+    if (code.length !== 6) { errorMsg.innerText = '请输入 6 位码'; errorMsg.style.display = 'block'; return; }
+    
+    btn.disabled = true;
+    errorMsg.style.display = 'none';
+
+    try {
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        document.getElementById('resName').innerText = data.data.name;
+        document.getElementById('resDesc').innerText = data.data.desc;
+        document.getElementById('resDetail').innerText = data.data.detail;
+        document.getElementById('userView').classList.add('hidden');
+        document.getElementById('resultView').classList.remove('hidden');
+      } else {
+        errorMsg.innerText = data.error || '验证失败';
+        errorMsg.style.display = 'block';
+      }
+    } catch (e) {
+      errorMsg.innerText = '网络错误';
+      errorMsg.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // --- 管理员功能 ---
+  function showAdmin() {
+    document.getElementById('userView').classList.add('hidden');
+    document.getElementById('adminView').classList.remove('hidden');
+  }
+
+  async function generateCode() {
+    const pass = document.getElementById('adminPass').value;
+    const resDiv = document.getElementById('genResult');
+    
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pass })
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        resDiv.innerText = `生成成功: ${data.code}`;
+      } else {
+        resDiv.innerText = `失败: ${data.error}`;
+        resDiv.style.color = 'red';
+      }
+    } catch (e) {
+      resDiv.innerText = '网络错误';
+    }
+  }
+</script>
+</body>
+</html>
